@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vote Early Day Event Map</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    .container { display: flex; gap: 1.5rem; margin: 0; height: 100vh; padding: 1rem; }
+    .left-panel { flex: 0 0 280px; }
+    .right-panel { flex: 1; }
+    .search-controls { display: flex; flex-direction: column; gap: 12px; }
+    .search-controls input, .search-controls select { padding: 12px 14px; border: 2px solid #6cb090; border-radius: 4px; font-size: 14px; background: white; color: #333; }
+    .search-controls input::placeholder { color: #999; }
+    .search-controls input:focus, .search-controls select:focus { outline: none; border-color: #551b7a; }
+    .button-row { display: flex; gap: 10px; }
+    button { flex: 1; padding: 12px 14px; border: 2px solid #551b7a; background: #551b7a; color: white; cursor: pointer; font-size: 13px; font-weight: 600; border-radius: 4px; }
+    button:hover { background: #6cb090; border-color: #6cb090; }
+    .map-container { height: calc(100vh - 2rem); border: 2px solid #551b7a; border-radius: 8px; overflow: hidden; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="left-panel">
+      <div class="search-controls">
+        <input type="text" id="cityInput" placeholder="City">
+        <input type="text" id="stateInput" placeholder="State">
+        <input type="text" id="zipInput" placeholder="Zip code">
+        <select id="radiusSelect">
+          <option value="">Select distance radius</option>
+          <option value="1">Less than 1 mile</option>
+          <option value="5">5 miles</option>
+          <option value="10">10 miles</option>
+          <option value="15">15 miles</option>
+          <option value="20">20 miles</option>
+          <option value="25">25 miles</option>
+        </select>
+        <div class="button-row">
+          <button onclick="filterEvents()">Search</button>
+          <button onclick="clearFilters()">Clear</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="right-panel">
+      <div class="map-container" id="map"></div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script>
+    let map, markers = [], allEvents = [], filteredEvents = [], radiusCircle = null, centerMarker = null;
+    const rsvpFormUrl = 'https://forms.gle/mhrqg8h9wzutHs766';
+    const responseSheetUrl = 'https://docs.google.com/spreadsheets/d/1Zoob14v_qK3QSUP-hrvbp6BBLc6QpevdUdR5iQE9YF0/export?format=csv';
+
+    function initMap() {
+      map = L.map('map').setView([39.8283, -98.5795], 4);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap',
+        maxZoom: 19
+      }).addTo(map);
+    }
+
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+      const R = 3959;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
+    }
+
+    async function geocodeZipcode(zip) {
+      try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(zip)}&format=json&limit=1`);
+        const results = await response.json();
+        if (results.length > 0) {
+          return { lat: parseFloat(results[0].lat), lon: parseFloat(results[0].lon) };
+        }
+      } catch (e) {
+        console.error('Geocoding error:', e);
+      }
+      return null;
+    }
+
+    async function fetchEvents() {
+      try {
+        const response = await fetch(responseSheetUrl);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        
+        const csv = await response.text();
+        const rows = csv.split('\n');
+        const headers = rows[0].split(',').map(h => h.trim().toLowerCase());
+        
+        const stateIdx = headers.findIndex(h => h.includes('state') || h.includes('estado'));
+        const cityIdx = headers.findIndex(h => h.includes('city') || h.includes('ciudad'));
+        const zipIdx = headers.findIndex(h => h.includes('zip') || h.includes('código') || h.includes('codigo'));
+        const locationIdx = headers.findIndex(h => h.includes('where') || h.includes('dirección') || h.includes('host') || h.includes('event'));
+        
+        allEvents = [];
+        for (let i = 1; i < rows.length; i++) {
+          if (!rows[i].trim()) continue;
+          const cells = rows[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+          
+          const eventObj = {
+            timestamp: cells[0] || '',
+            state: stateIdx >= 0 ? cells[stateIdx] || '' : '',
+            city: cityIdx >= 0 ? cells[cityIdx] || '' : '',
+            zip: zipIdx >= 0 ? cells[zipIdx] || '' : '',
+            location: locationIdx >= 0 ? cells[locationIdx] || '' : '',
+            allData: {},
+            lat: null,
+            lon: null
+          };
+          
+          headers.forEach((header, idx) => {
+            if (cells[idx]) eventObj.allData[header] = cells[idx];
+          });
+          
+          if (eventObj.city && eventObj.state) allEvents.push(eventObj);
+        }
+        
+        filteredEvents = [...allEvents];
+        await geocodeAllEvents();
+        geocodeAndMapEvents();
+      } catch (e) {
+        console.error('Error loading events:', e);
+      }
+    }
+
+    async function geocodeAllEvents() {
+      for (const event of allEvents) {
+        if (event.lat && event.lon) continue;
+        const address = `${event.city}, ${event.state} ${event.zip}`;
+        try {
+          const geocodeResponse = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`);
+          const results = await geocodeResponse.json();
+          if (results.length > 0) {
+            event.lat = parseFloat(results[0].lat);
+            event.lon = parseFloat(results[0].lon);
+          }
+        } catch (e) {}
+        await new Promise(r => setTimeout(r, 300));
+      }
+    }
+
+    async function geocodeAndMapEvents() {
+      markers.forEach(m => map.removeLayer(m));
+      markers = [];
+      
+      for (const event of filteredEvents) {
+        if (!event.lat || !event.lon) continue;
+        
+        let popupContent = `<div style="font-weight:600; color:#551b7a; margin-bottom:8px; font-size:14px">${event.location}</div>`;
+        popupContent += `<div style="color:#333; line-height:1.5; font-size:13px">`;
+        popupContent += `<strong>${event.city}, ${event.state} ${event.zip}</strong><br><br>`;
+        
+        Object.keys(event.allData).forEach(key => {
+          if (event.allData[key]) popupContent += `<strong>${key}:</strong> ${event.allData[key]}<br>`;
+        });
+        
+        popupContent += `<br><a href="${rsvpFormUrl}" target="_blank" style="color:#6cb090; font-weight:600; text-decoration:none">Register →</a></div>`;
+        
+        const marker = L.marker([event.lat, event.lon]).addTo(map);
+        marker.bindPopup(popupContent);
+        markers.push(marker);
+      }
+    }
+
+    function filterEvents() {
+      const city = document.getElementById('cityInput').value.toLowerCase().trim();
+      const state = document.getElementById('stateInput').value.toLowerCase().trim();
+      const zip = document.getElementById('zipInput').value.toLowerCase().trim();
+      const radius = parseFloat(document.getElementById('radiusSelect').value) || null;
+      
+      filteredEvents = [...allEvents];
+      
+      if (zip && radius) {
+        geocodeZipcode(zip).then(userLocation => {
+          if (userLocation) {
+            filteredEvents = allEvents.filter(e => {
+              if (!e.lat || !e.lon) return false;
+              return calculateDistance(userLocation.lat, userLocation.lon, e.lat, e.lon) <= radius;
+            });
+            if (city) filteredEvents = filteredEvents.filter(e => e.city.toLowerCase().includes(city));
+            if (state) filteredEvents = filteredEvents.filter(e => e.state.toLowerCase().includes(state));
+            geocodeAndMapEvents();
+            zoomToZipcode(userLocation, radius);
+          }
+        });
+      } else {
+        if (city) filteredEvents = filteredEvents.filter(e => e.city.toLowerCase().includes(city));
+        if (state) filteredEvents = filteredEvents.filter(e => e.state.toLowerCase().includes(state));
+        geocodeAndMapEvents();
+        map.setView([39.8283, -98.5795], 4);
+        if (radiusCircle) { map.removeLayer(radiusCircle); radiusCircle = null; }
+        if (centerMarker) { map.removeLayer(centerMarker); centerMarker = null; }
+      }
+    }
+
+    function zoomToZipcode(location, radiusMiles) {
+      if (radiusCircle) map.removeLayer(radiusCircle);
+      if (centerMarker) map.removeLayer(centerMarker);
+      
+      map.setView([location.lat, location.lon], 12);
+      const radiusMeters = radiusMiles * 1609.34;
+      radiusCircle = L.circle([location.lat, location.lon], {
+        color: '#6cb090', fillColor: '#6cb090', fillOpacity: 0.1, weight: 2, radius: radiusMeters
+      }).addTo(map);
+      
+      centerMarker = L.marker([location.lat, location.lon], {
+        icon: L.icon({
+          iconUrl: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0Ij48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSI4IiBmaWxsPSIjNTUxYjdhIi8+PC9zdmc+',
+          iconSize: [24, 24], iconAnchor: [12, 12]
+        })
+      }).addTo(map);
+    }
+
+    function clearFilters() {
+      document.getElementById('cityInput').value = '';
+      document.getElementById('stateInput').value = '';
+      document.getElementById('zipInput').value = '';
+      document.getElementById('radiusSelect').value = '';
+      filteredEvents = [...allEvents];
+      geocodeAndMapEvents();
+      map.setView([39.8283, -98.5795], 4);
+      if (radiusCircle) { map.removeLayer(radiusCircle); radiusCircle = null; }
+      if (centerMarker) { map.removeLayer(centerMarker); centerMarker = null; }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      initMap();
+      fetchEvents();
+    });
+  </script>
+</body>
+</html>
