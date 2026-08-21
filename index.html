@@ -274,8 +274,10 @@
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-    // Converted publication link target from pubhtml to output=csv format
     const sheetCsvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSPlFiILWGMtBzS0lbFH4zfdFymAM_pNpyelNicCzcW3XwCwhzIeEgGNyD52Ob4mI3eHwziH6rEqco8/pub?gid=403401447&single=true&output=csv";
+    // Wrapped with a reliable public CORS proxy to bypass cross-origin redirect blocks
+    const proxyUrl = "https://api.allorigins.win/raw?url=" + encodeURIComponent(sheetCsvUrl);
+    
     const rsvpFormUrl = "https://docs.google.com/forms/d/e/1FAIpQLSfiDlq2TF_bDsWBCFGq-AeBpZjVAi43Gt8BTwn03wObSKjpSQ/viewform?usp=dialog";
     
     // Initialize Map
@@ -335,7 +337,7 @@ document.addEventListener("DOMContentLoaded", function () {
     async function loadSheetData() {
         document.getElementById('mapStatus').innerText = "Syncing with Google Sheet...";
         try {
-            let response = await fetch(sheetCsvUrl + "&t=" + new Date().getTime());
+            let response = await fetch(proxyUrl + "&t=" + new Date().getTime());
             let text = await response.text();
             let rawEvents = parseCSV(text);
             
@@ -417,7 +419,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
         // 2. Radius Distance Filter if a radius is chosen and text query exists
         if (radiusVal !== "all" && term && baseFiltered.length > 0) {
-            // Find the center coordinate of the search term
             try {
                 let res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(term)}`);
                 let json = await res.json();
