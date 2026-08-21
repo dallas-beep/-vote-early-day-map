@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Community Events Map</title>
-    <!-- Leaflet CSS -->
+    <title>Vote Early Day Event Map</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
     <style>
         body {
@@ -31,8 +30,6 @@
             }
             #interactiveMapContainer { height: 450px; }
         }
-        
-        /* Left Sidebar Panel */
         .map-sidebar-panel {
             display: flex;
             flex-direction: column;
@@ -40,8 +37,6 @@
             height: 100%;
             box-sizing: border-box;
         }
-
-        /* Search Bar & Radius Controls */
         .search-controls-wrapper {
             display: flex;
             flex-direction: column;
@@ -52,7 +47,6 @@
             border: 1px solid #e0e0e0;
             box-shadow: 0 2px 5px rgba(0,0,0,0.03);
         }
-
         .search-bar-container {
             position: relative;
             display: flex;
@@ -94,8 +88,6 @@
             height: 16px;
             fill: currentColor;
         }
-
-        /* Radius Dropdown Style */
         .radius-select-group {
             display: flex;
             align-items: center;
@@ -120,16 +112,12 @@
         .radius-select-group select:focus {
             border-color: #551b7a;
         }
-
-        /* Events List Header */
         .events-list-title {
             margin: 0;
             font-size: 18px;
             font-weight: 700;
             color: #111;
         }
-        
-        /* Event List Container */
         .event-sidebar-list {
             background: transparent;
             overflow-y: auto;
@@ -139,8 +127,6 @@
             gap: 12px;
             padding-right: 4px;
         }
-        
-        /* Individual Event Cards */
         .sidebar-event-card {
             padding: 16px;
             border: 1px solid #e0e0e0;
@@ -177,8 +163,6 @@
             border-radius: 12px;
             border: 1px solid #e0e0e0;
         }
-
-        /* Status Bar at Bottom of Sidebar */
         .map-status-bar {
             font-size: 12px;
             color: #ffffff;
@@ -189,8 +173,6 @@
             text-align: center;
             box-shadow: 0 2px 4px rgba(85,27,122,0.2);
         }
-
-        /* Right Large Map Box */
         #interactiveMapContainer {
             width: 100%;
             height: 100%;
@@ -200,8 +182,6 @@
             box-shadow: 0 2px 6px rgba(0,0,0,0.04);
             z-index: 1;
         }
-
-        /* Map Popup Customization */
         .map-popup-box h3 { 
             color: #551b7a; 
             margin: 0 0 8px 0; 
@@ -232,17 +212,14 @@
 <body>
 
 <div class="community-map-wrapper">
-    <!-- Left Column: Search & Event List -->
     <div class="map-sidebar-panel">
         <div class="search-controls-wrapper">
-            <!-- Search bar with round purple button -->
             <div class="search-bar-container">
                 <input type="text" id="zipSearchInput" placeholder="Filter by city, state, or zip..." />
                 <button id="searchBtn" class="search-icon-btn" type="button" aria-label="Search">
                     <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
                 </button>
             </div>
-            <!-- Distance Radius Dropdown -->
             <div class="radius-select-group">
                 <label for="radiusSelect">Radius:</label>
                 <select id="radiusSelect">
@@ -258,28 +235,24 @@
         </div>
 
         <h3 class="events-list-title">Events List</h3>
-
         <div class="event-sidebar-list" id="eventSidebarList">
             <div class="event-card-placeholder">Syncing live events...</div>
         </div>
         <div class="map-status-bar" id="mapStatus">Connecting...</div>
     </div>
 
-    <!-- Right Column: Larger Interactive Map -->
     <div id="interactiveMapContainer"></div>
 </div>
 
-<!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-    // Your Apps Script Web App URL
-    const responseSheetUrl = 'https://script.google.com/macros/s/AKfycbyaYC2PXvQHqEqraNw7gb-Er9ssrWJuhXUfuz57gzCfoxkuzF_PyXTatQhbhqqIBTf0_w/exec';
+    // REPLACE WITH YOUR APPS SCRIPT URL
+    const responseSheetUrl = 'https://script.google.com/macros/s/YOUR_APPS_SCRIPT_URL_HERE/exec';
     
-    const rsvpFormUrl = "https://docs.google.com/forms/d/e/1FAIpQLSfiDlq2TF_bDsWBCFGq-AeBpZjVAi43Gt8BTwn03wObSKjpSQ/viewform?usp=dialog";
+    const rsvpFormUrl = "https://forms.gle/mhrqg8h9wzutHs766";
     
-    // Initialize Map
     const map = L.map('interactiveMapContainer').setView([39.8283, -98.5795], 4);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
         maxZoom: 18,
@@ -289,10 +262,16 @@ document.addEventListener("DOMContentLoaded", function () {
     let markersLayer = L.layerGroup().addTo(map);
     let resolvedEvents = [];
 
-    // Safe CSV Parsing handling columns G(6), H(7), I(8), J(9)
     function parseCSV(text) {
         let lines = text.split("\n");
         let result = [];
+        let headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+        
+        const stateIdx = headers.findIndex(h => h.includes('state') || h.includes('estado'));
+        const cityIdx = headers.findIndex(h => h.includes('city') || h.includes('ciudad'));
+        const zipIdx = headers.findIndex(h => h.includes('zip') || h.includes('código') || h.includes('codigo'));
+        const addressIdx = headers.findIndex(h => h.includes('where') || h.includes('address') || h.includes('dirección') || h.includes('event'));
+
         for (let i = 1; i < lines.length; i++) {
             if (!lines[i].trim()) continue;
             let vals = [];
@@ -311,24 +290,20 @@ document.addEventListener("DOMContentLoaded", function () {
             vals.push(current.trim().replace(/^["']|["']$/g, ""));
             
             result.push({
-                state: vals[6] || '',
-                city: vals[7] || '',
-                zip: vals[8] || '',
-                address: vals[9] || ''
+                state: stateIdx >= 0 ? vals[stateIdx] || '' : '',
+                city: cityIdx >= 0 ? vals[cityIdx] || '' : '',
+                zip: zipIdx >= 0 ? vals[zipIdx] || '' : '',
+                address: addressIdx >= 0 ? vals[addressIdx] || '' : ''
             });
         }
         return result;
     }
 
-    // Haversine distance formula in miles
     function calculateDistance(lat1, lon1, lat2, lon2) {
-        const R = 3958.8; // Radius of the earth in miles
+        const R = 3958.8;
         let dLat = (lat2 - lat1) * Math.PI / 180;
         let dLon = (lon2 - lon1) * Math.PI / 180;
-        let a = 
-            Math.sin(dLat/2) * Math.sin(dLat/2) +
-            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-            Math.sin(dLon/2) * Math.sin(dLon/2);
+        let a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
         let c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         return R * c;
     }
@@ -368,6 +343,7 @@ document.addEventListener("DOMContentLoaded", function () {
         } catch (e) {
             document.getElementById('eventSidebarList').innerHTML = '<div class="event-card-placeholder">Failed to connect to sheet data.</div>';
             document.getElementById('mapStatus').innerText = "Sync error";
+            console.error(e);
         }
     }
 
@@ -382,9 +358,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
         eventsToRender.forEach((ev, idx) => {
             let popup = `<div class="map-popup-box">
-                <h3>Event Location</h3>
+                <h3>${ev.city}, ${ev.state} ${ev.zip}</h3>
                 <p><strong>Address:</strong> ${ev.address || 'N/A'}</p>
-                <p><strong>City, State:</strong> ${ev.city}, ${ev.state} ${ev.zip}</p>
                 <a href="${rsvpFormUrl}" target="_blank" class="rsvp-btn-popup">RSVP For This Event</a>
             </div>`;
 
@@ -406,7 +381,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
         let baseFiltered = resolvedEvents;
 
-        // 1. Text Search Filter (Zip, city, state, address)
         if (term) {
             baseFiltered = baseFiltered.filter(ev => 
                 ev.zip.toLowerCase().includes(term) ||
@@ -416,7 +390,6 @@ document.addEventListener("DOMContentLoaded", function () {
             );
         }
 
-        // 2. Radius Distance Filter if a radius is chosen and text query exists
         if (radiusVal !== "all" && term && baseFiltered.length > 0) {
             try {
                 let res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(term)}`);
@@ -445,7 +418,6 @@ document.addEventListener("DOMContentLoaded", function () {
     });
     document.getElementById('radiusSelect').addEventListener('change', handleFilter);
 
-    // Initial load and auto-refresh loop
     loadSheetData();
     setInterval(loadSheetData, 300000);
 });
