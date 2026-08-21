@@ -10,15 +10,16 @@
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             margin: 0;
-            padding: 20px;
+            padding: 16px;
             background-color: #f9f9f9;
             color: #333;
         }
         .community-map-wrapper {
             display: grid;
-            grid-template-columns: 360px 1fr;
-            gap: 24px;
-            height: 85vh;
+            grid-template-columns: 380px 1fr;
+            gap: 20px;
+            height: 88vh;
+            min-height: 550px;
             max-width: 1400px;
             margin: 0 auto;
             box-sizing: border-box;
@@ -31,116 +32,134 @@
             #interactiveMapContainer { height: 450px; }
         }
         
-        /* Left Sidebar */
+        /* Left Sidebar Panel */
         .map-sidebar-panel {
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 16px;
             height: 100%;
             box-sizing: border-box;
         }
-        .search-box-container {
-            background: #ffffff;
-            padding: 16px;
-            border: 1px solid #e0e0e0;
-            border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-        }
-        .search-box-container h3 {
-            margin: 0 0 10px 0;
-            font-size: 16px;
-            color: #551b7a;
-        }
-        .search-input-group {
+
+        /* Search Bar styled like your screenshot */
+        .search-bar-container {
+            position: relative;
             display: flex;
-            gap: 8px;
+            align-items: center;
         }
-        .search-input-group input {
-            flex: 1;
-            padding: 10px 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 6px;
+        .search-bar-container input {
+            width: 100%;
+            padding: 12px 48px 12px 16px;
+            border: 1px solid #ddd;
+            border-radius: 30px;
             font-size: 14px;
             outline: none;
+            background: #ffffff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.03);
             transition: border-color 0.2s;
         }
-        .search-input-group input:focus {
+        .search-bar-container input:focus {
             border-color: #551b7a;
         }
-        #searchBtn {
+        .search-icon-btn {
+            position: absolute;
+            right: 6px;
             background-color: #551b7a;
             color: #ffffff;
             border: none;
-            padding: 0 16px;
-            border-radius: 6px;
-            font-weight: 600;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             cursor: pointer;
             transition: background 0.2s;
         }
-        #searchBtn:hover {
+        .search-icon-btn:hover {
             background-color: #6cb090;
         }
-        .search-hint {
-            font-size: 12px;
-            color: #777;
-            margin: 6px 0 0 0;
+        .search-icon-btn svg {
+            width: 16px;
+            height: 16px;
+            fill: currentColor;
+        }
+
+        /* Events List Header */
+        .events-list-title {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 700;
+            color: #111;
         }
         
-        /* Event List Sidebar */
+        /* Event List Container */
         .event-sidebar-list {
-            background: #ffffff;
-            border: 1px solid #e0e0e0;
-            border-radius: 10px;
+            background: transparent;
             overflow-y: auto;
             flex: 1;
-            padding: 12px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding-right: 4px;
         }
+        
+        /* Individual Event Cards */
         .sidebar-event-card {
-            padding: 12px;
-            margin-bottom: 10px;
-            border: 1px solid #eee;
+            padding: 16px;
+            border: 1px solid #e0e0e0;
             cursor: pointer;
-            border-radius: 8px;
-            background: #fff;
-            transition: all 0.2s;
+            border-radius: 12px;
+            background: #ffffff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            transition: all 0.2s ease;
         }
         .sidebar-event-card:hover {
             border-color: #6cb090;
-            background: #f4fbf7;
             transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
         }
         .sidebar-event-card h4 {
             margin: 0 0 4px 0;
             color: #551b7a;
-            font-size: 15px;
+            font-size: 16px;
+            font-weight: 700;
+            line-height: 1.2;
         }
         .sidebar-event-card p {
             margin: 0;
             font-size: 13px;
-            color: #555;
+            color: #6cb090;
+            font-weight: 500;
         }
         .event-card-placeholder {
-            padding: 20px;
+            padding: 24px;
             text-align: center;
             color: #777;
             font-size: 14px;
+            background: #ffffff;
+            border-radius: 12px;
+            border: 1px solid #e0e0e0;
         }
+
+        /* Status Bar at Bottom of Sidebar */
         .map-status-bar {
             font-size: 12px;
-            color: #551b7a;
-            background: #f4f0f7;
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-weight: 500;
+            color: #ffffff;
+            background: #551b7a;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-weight: 600;
             text-align: center;
+            box-shadow: 0 2px 4px rgba(85,27,122,0.2);
         }
 
         /* Right Large Map Box */
         #interactiveMapContainer {
             width: 100%;
             height: 100%;
-            border-radius: 10px;
+            min-height: 500px;
+            border-radius: 12px;
             border: 1px solid #e0e0e0;
             box-shadow: 0 2px 6px rgba(0,0,0,0.04);
             z-index: 1;
@@ -179,14 +198,16 @@
 <div class="community-map-wrapper">
     <!-- Left Column: Search & Event List -->
     <div class="map-sidebar-panel">
-        <div class="search-box-container">
-            <h3>Find Community Events</h3>
-            <div class="search-input-group">
-                <input type="text" id="zipSearchInput" placeholder="Filter by zip, city, or state..." />
-                <button id="searchBtn" type="button">Search</button>
-            </div>
-            <p class="search-hint">Type a location to filter the map pins.</p>
+        <!-- Search bar with round purple button & looking-glass icon -->
+        <div class="search-bar-container">
+            <input type="text" id="zipSearchInput" placeholder="Filter by city, state, or zip..." />
+            <button id="searchBtn" class="search-icon-btn" type="button" aria-label="Search">
+                <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+            </button>
         </div>
+
+        <h3 class="events-list-title">Events List</h3>
+
         <div class="event-sidebar-list" id="eventSidebarList">
             <div class="event-card-placeholder">Syncing live events...</div>
         </div>
@@ -253,7 +274,7 @@ document.addEventListener("DOMContentLoaded", function () {
             let text = await response.text();
             allEvents = parseCSV(text);
             renderEvents(allEvents);
-            document.getElementById('mapStatus').innerText = `Synced (${allEvents.length} events loaded)`;
+            document.getElementById('mapStatus').innerText = `Synced (${allEvents.length} events)`;
         } catch (e) {
             document.getElementById('eventSidebarList').innerHTML = '<div class="event-card-placeholder">Failed to connect to sheet data.</div>';
             document.getElementById('mapStatus').innerText = "Sync error";
@@ -289,8 +310,8 @@ document.addEventListener("DOMContentLoaded", function () {
                     marker.bindPopup(popup);
 
                     sidebarHTML += `<div class="sidebar-event-card" onclick="map.setView([${lat}, ${lon}], 14); markersLayer.getLayers()[${validCount-1}].openPopup();">
-                        <h4>${ev.city ? ev.city + ', ' : ''}${ev.state} ${ev.zip}</h4>
-                        <p>${ev.address || 'Click to view on map'}</p>
+                        <h4>${ev.city ? ev.city.toUpperCase() + ', ' : ''}${ev.state.toUpperCase()} (${ev.zip})</h4>
+                        <p>${ev.address || 'View details on map'}</p>
                     </div>`;
                 }
             } catch (err) {
