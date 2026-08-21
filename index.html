@@ -274,8 +274,11 @@
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-    // Integrated custom responseSheetUrl variable
-    const responseSheetUrl = 'https://cors-anywhere.herokuapp.com/https://docs.google.com/spreadsheets/d/e/2PACX-1vSPlFiILWGMtBzS0lbFH4zfdFymAM_pNpyelNicCzcW3XwCwhzIeEgGNyD52Ob4mI3eHwziH6rEqco8/pub?gid=403401447&single=true&output=csv';
+    // Your exact Google Sheet URL
+    const responseSheetUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSPlFiILWGMtBzS0lbFH4zfdFymAM_pNpyelNicCzcW3XwCwhzIeEgGNyD52Ob4mI3eHwziH6rEqco8/pub?gid=403401447&single=true&output=csv';
+    
+    // Wrapped with a reliable proxy to avoid 403 / CORS blocks entirely
+    const proxyUrl = "https://api.allorigins.win/raw?url=" + encodeURIComponent(responseSheetUrl);
     
     const rsvpFormUrl = "https://docs.google.com/forms/d/e/1FAIpQLSfiDlq2TF_bDsWBCFGq-AeBpZjVAi43Gt8BTwn03wObSKjpSQ/viewform?usp=dialog";
     
@@ -336,7 +339,7 @@ document.addEventListener("DOMContentLoaded", function () {
     async function loadSheetData() {
         document.getElementById('mapStatus').innerText = "Syncing with Google Sheet...";
         try {
-            let response = await fetch(responseSheetUrl + "&t=" + new Date().getTime());
+            let response = await fetch(proxyUrl + "&t=" + new Date().getTime());
             let text = await response.text();
             let rawEvents = parseCSV(text);
             
