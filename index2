@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Community Events Map</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f9f9f9;
+            color: #333;
+        }
+        .community-map-wrapper {
+            display: grid;
+            grid-template-columns: 360px 1fr;
+            gap: 24px;
+            height: 85vh;
+            max-width: 1400px;
+            margin: 0 auto;
+            box-sizing: border-box;
+        }
+        @media (max-width: 900px) {
+            .community-map-wrapper {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+            #interactiveMapContainer { height: 450px; }
+        }
+        
+        /* Left Sidebar */
+        .map-sidebar-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            height: 100%;
+            box-sizing: border-box;
+        }
+        .search-box-container {
+            background: #ffffff;
+            padding: 16px;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+        .search-box-container h3 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+            color: #551b7a;
+        }
+        .search-input-group {
+            display: flex;
+            gap: 8px;
+        }
+        .search-input-group input {
+            flex: 1;
+            padding: 10px 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .search-input-group input:focus {
+            border-color: #551b7a;
+        }
+        #searchBtn {
+            background-color: #551b7a;
+            color: #ffffff;
+            border: none;
+            padding: 0 16px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        #searchBtn:hover {
+            background-color: #6cb090;
+        }
+        .search-hint {
+            font-size: 12px;
+            color: #777;
+            margin: 6px 0 0 0;
+        }
+        
+        /* Event List Sidebar */
+        .event-sidebar-list {
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            overflow-y: auto;
+            flex: 1;
+            padding: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+        .sidebar-event-card {
+            padding: 12px;
+            margin-bottom: 10px;
+            border: 1px solid #eee;
+            cursor: pointer;
+            border-radius: 8px;
+            background: #fff;
+            transition: all 0.2s;
+        }
+        .sidebar-event-card:hover {
+            border-color: #6cb090;
+            background: #f4fbf7;
+            transform: translateY(-1px);
+        }
+        .sidebar-event-card h4 {
+            margin: 0 0 4px 0;
+            color: #551b7a;
+            font-size: 15px;
+        }
+        .sidebar-event-card p {
+            margin: 0;
+            font-size: 13px;
+            color: #555;
+        }
+        .event-card-placeholder {
+            padding: 20px;
+            text-align: center;
+            color: #777;
+            font-size: 14px;
+        }
+        .map-status-bar {
+            font-size: 12px;
+            color: #551b7a;
+            background: #f4f0f7;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-weight: 500;
+            text-align: center;
+        }
+
+        /* Right Large Map Box */
+        #interactiveMapContainer {
+            width: 100%;
+            height: 100%;
+            border-radius: 10px;
+            border: 1px solid #e0e0e0;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+            z-index: 1;
+        }
+
+        /* Map Popup Customization */
+        .map-popup-box h3 { 
+            color: #551b7a; 
+            margin: 0 0 8px 0; 
+            font-size: 16px; 
+        }
+        .map-popup-box p { 
+            margin: 4px 0; 
+            font-size: 13px; 
+            color: #444; 
+        }
+        .rsvp-btn-popup {
+            display: inline-block;
+            margin-top: 10px;
+            background-color: #551b7a;
+            color: #ffffff !important;
+            padding: 8px 14px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+        .rsvp-btn-popup:hover { 
+            background-color: #6cb090; 
+        }
+    </style>
+</head>
+<body>
+
+<div class="community-map-wrapper">
+    <!-- Left Column: Search & Event List -->
+    <div class="map-sidebar-panel">
+        <div class="search-box-container">
+            <h3>Find Community Events</h3>
+            <div class="search-input-group">
+                <input type="text" id="zipSearchInput" placeholder="Filter by zip, city, or state..." />
+                <button id="searchBtn" type="button">Search</button>
+            </div>
+            <p class="search-hint">Type a location to filter the map pins.</p>
+        </div>
+        <div class="event-sidebar-list" id="eventSidebarList">
+            <div class="event-card-placeholder">Syncing live events...</div>
+        </div>
+        <div class="map-status-bar" id="mapStatus">Connecting...</div>
+    </div>
+
+    <!-- Right Column: Larger Interactive Map -->
+    <div id="interactiveMapContainer"></div>
+</div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const sheetCsvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSPlFiILWGMtBzS0lbFH4zfdFymAM_pNpyelNicCzcW3XwCwhzIeEgGNyD52Ob4mI3eHwziH6rEqco8/pub?gid=403401447&single=true&output=csv";
+    const rsvpFormUrl = "https://docs.google.com/forms/d/e/1FAIpQLSfiDlq2TF_bDsWBCFGq-AeBpZjVAi43Gt8BTwn03wObSKjpSQ/viewform?usp=dialog";
+    
+    // Initialize Map
+    const map = L.map('interactiveMapContainer').setView([39.8283, -98.5795], 4);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
+        maxZoom: 18,
+        attribution: '&copy; OpenStreetMap contributors' 
+    }).addTo(map);
+    
+    let markersLayer = L.layerGroup().addTo(map);
+    let allEvents = [];
+
+    // Safe CSV Parsing handling columns G(6), H(7), I(8), J(9)
+    function parseCSV(text) {
+        let lines = text.split("\n");
+        let result = [];
+        for (let i = 1; i < lines.length; i++) {
+            if (!lines[i].trim()) continue;
+            let vals = [];
+            let current = "";
+            let inQuotes = false;
+            for (let c = 0; c < lines[i].length; c++) {
+                let char = lines[i][c];
+                if (char === '"') inQuotes = !inQuotes;
+                else if (char === ',' && !inQuotes) {
+                    vals.push(current.trim().replace(/^["']|["']$/g, ""));
+                    current = "";
+                } else {
+                    current += char;
+                }
+            }
+            vals.push(current.trim().replace(/^["']|["']$/g, ""));
+            
+            result.push({
+                state: vals[6] || '',
+                city: vals[7] || '',
+                zip: vals[8] || '',
+                address: vals[9] || ''
+            });
+        }
+        return result;
+    }
+
+    async function loadSheetData() {
+        document.getElementById('mapStatus').innerText = "Syncing with Google Sheet...";
+        try {
+            let response = await fetch(sheetCsvUrl + "&t=" + new Date().getTime());
+            let text = await response.text();
+            allEvents = parseCSV(text);
+            renderEvents(allEvents);
+            document.getElementById('mapStatus').innerText = `Synced (${allEvents.length} events loaded)`;
+        } catch (e) {
+            document.getElementById('eventSidebarList').innerHTML = '<div class="event-card-placeholder">Failed to connect to sheet data.</div>';
+            document.getElementById('mapStatus').innerText = "Sync error";
+        }
+    }
+
+    async function renderEvents(eventsToRender) {
+        markersLayer.clearLayers();
+        let sidebarHTML = "";
+        let validCount = 0;
+
+        for (const ev of eventsToRender) {
+            if (!ev.city && !ev.zip && !ev.address) continue;
+            let query = `${ev.address}, ${ev.city}, ${ev.state} ${ev.zip}`;
+            
+            try {
+                let res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+                let json = await res.json();
+                
+                if (json.length > 0) {
+                    let lat = parseFloat(json[0].lat);
+                    let lon = parseFloat(json[0].lon);
+                    validCount++;
+
+                    let popup = `<div class="map-popup-box">
+                        <h3>Event Location</h3>
+                        <p><strong>Address:</strong> ${ev.address || 'N/A'}</p>
+                        <p><strong>City, State:</strong> ${ev.city}, ${ev.state} ${ev.zip}</p>
+                        <a href="${rsvpFormUrl}" target="_blank" class="rsvp-btn-popup">RSVP For This Event</a>
+                    </div>`;
+
+                    let marker = L.marker([lat, lon]).addTo(markersLayer);
+                    marker.bindPopup(popup);
+
+                    sidebarHTML += `<div class="sidebar-event-card" onclick="map.setView([${lat}, ${lon}], 14); markersLayer.getLayers()[${validCount-1}].openPopup();">
+                        <h4>${ev.city ? ev.city + ', ' : ''}${ev.state} ${ev.zip}</h4>
+                        <p>${ev.address || 'Click to view on map'}</p>
+                    </div>`;
+                }
+            } catch (err) {
+                console.error("Geocode lookup skipped");
+            }
+        }
+
+        if (validCount === 0) {
+            document.getElementById('eventSidebarList').innerHTML = '<div class="event-card-placeholder">No matching events found.</div>';
+        } else {
+            document.getElementById('eventSidebarList').innerHTML = sidebarHTML;
+        }
+    }
+
+    function handleSearch() {
+        let term = document.getElementById('zipSearchInput').value.toLowerCase().trim();
+        if (!term) {
+            renderEvents(allEvents);
+            return;
+        }
+        let filtered = allEvents.filter(ev => 
+            ev.zip.toLowerCase().includes(term) ||
+            ev.city.toLowerCase().includes(term) ||
+            ev.state.toLowerCase().includes(term) ||
+            ev.address.toLowerCase().includes(term)
+        );
+        renderEvents(filtered);
+    }
+
+    document.getElementById('searchBtn').addEventListener('click', handleSearch);
+    document.getElementById('zipSearchInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') handleSearch();
+    });
+
+    // Initial load and 5-minute background auto-refresh loop
+    loadSheetData();
+    setInterval(loadSheetData, 300000);
+});
+</script>
+</body>
+</html>
