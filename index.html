@@ -273,107 +273,155 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
 <script>
-document.addEventListener("DOMContentLoaded", function () {
-    const responseSheetUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSPlFiILWGMtBzS0lbFH4zfdFymAM_pNpyelNicCzcW3XwCwhzIeEgGNyD52Ob4mI3eHwziH6rEqco8/pub?output=csv&gid=403401447&single=true';
-    const rsvpFormUrl = "https://docs.google.com/forms/d/e/1FAIpQLSfiDlq2TF_bDsWBCFGq-AeBpZjVAi43Gt8BTwn03wObSKjpSQ/viewform?usp=dialog";
-    
-    const map = L.map('interactiveMapContainer').setView([39.8283, -98.5795], 4);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
-        maxZoom: 18,
-        attribution: '&copy; OpenStreetMap contributors' 
-    }).addTo(map);
-    
-    let markersLayer = L.layerGroup().addTo(map);
+    // Declare map and markersLayer globally so inline click handlers can access them
+    let map;
+    let markersLayer;
     let resolvedEvents = [];
 
-    // Robust CSV row parser handling quotes & commas properly
-    function parseCSVLine(textLine) {
-        let vals = [];
-        let current = "";
-        let inQuotes = false;
-        for (let c = 0; c < textLine.length; c++) {
-            let char = textLine[c];
-            if (char === '"') {
-                inQuotes = !inQuotes;
-            } else if (char === ',' && !inQuotes) {
-                vals.push(current.trim().replace(/^["']|["']$/g, ""));
-                current = "";
-            } else {
-                current += char;
+    document.addEventListener("DOMContentLoaded", function () {
+        const responseSheetUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSPlFiILWGMtBzS0lbFH4zfdFymAM_pNpyelNicCzcW3XwCwhzIeEgGNyD52Ob4mI3eHwziH6rEqco8/pub?output=csv&gid=403401447&single=true';
+        const rsvpFormUrl = "https://docs.google.com/forms/d/e/1FAIpQLSfiDlq2TF_bDsWBCFGq-AeBpZjVAi43Gt8BTwn03wObSKjpSQ/viewform?usp=dialog";
+        
+        map = L.map('interactiveMapContainer').setView([39.8283, -98.5795], 4);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
+            maxZoom: 18,
+            attribution: '&copy; OpenStreetMap contributors' 
+        }).addTo(map);
+        
+        markersLayer = L.layerGroup().addTo(map);
+
+        function parseCSVLine(textLine) {
+            let vals = [];
+            let current = "";
+            let inQuotes = false;
+            for (let c = 0; c < textLine.length; c++) {
+                let char = textLine[c];
+                if (char === '"') {
+                    inQuotes = !inQuotes;
+                } else if (char === ',' && !inQuotes) {
+                    vals.push(current.trim().replace(/^["']|["']$/g, ""));
+                    current = "";
+                } else {
+                    current += char;
+                }
+            }
+            vals.push(current.trim().replace(/^["']|["']$/g, ""));
+            return vals;
+        }
+
+        function parseCSV(text) {
+            let lines = text.split("\n");
+            let result = [];
+            for (let i = 1; i < lines.length; i++) {
+                if (!lines[i].trim()) continue;
+                let vals = parseCSVLine(lines[i]);
+                
+                result.push({
+                    state: vals[5] || '', // Column F (Index 5)
+                    city: vals[6] || '',  // Column G (Index 6)
+                    zip: vals[7] || '',   // Column H (Index 7)
+                    address: vals[8] || '' // Column I (Index 8)
+                });
+            }
+            return result;
+        }
+
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 3958.8; 
+            let dLat = (lat2 - lat1) * Math.PI / 180;
+            let dLon = (lon2 - lon1) * Math.PI / 180;
+            let a = 
+                Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+            let c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        async function loadSheetData() {
+            document.getElementById('mapStatus').innerText = "Syncing with Google Sheet...";
+            try {
+                let response = await fetch(responseSheetUrl + "&t=" + new Date().getTime());
+                let text = await response.text();
+                let rawEvents = parseCSV(text);
+                
+                resolvedEvents = [];
+                document.getElementById('mapStatus').innerText = `Geocoding ${rawEvents.length} locations...`;
+
+                for (const ev of rawEvents) {
+                    if (!ev.city && !ev.zip && !ev.address && !ev.state) continue;
+                    let query = `${ev.address}, ${ev.city}, ${ev.state} ${ev.zip}`;
+                    
+                    try {
+                        let res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+                        let json = await res.json();
+                        
+                        if (json.length > 0) {
+                            resolvedEvents.push({
+                                ...ev,
+                                lat: parseFloat(json[0].lat),
+                                lon: parseFloat(json[0].lon)
+                            });
+                        }
+                    } catch (err) {
+                        console.error("Geocode error skipped");
+                    }
+                }
+
+                renderEvents(resolvedEvents);
+                document.getElementById('mapStatus').innerText = `Synced (${resolvedEvents.length} events loaded)`;
+            } catch (e) {
+                document.getElementById('eventSidebarList').innerHTML = '<div class="event-card-placeholder">Failed to connect to sheet data.</div>';
+                document.getElementById('mapStatus').innerText = "Sync error";
             }
         }
-        vals.push(current.trim().replace(/^["']|["']$/g, ""));
-        return vals;
-    }
 
-    function parseCSV(text) {
-        let lines = text.split("\n");
-        let result = [];
-        // Loop through every single row starting from index 1 (Row 2 onwards)
-        for (let i = 1; i < lines.length; i++) {
-            if (!lines[i].trim()) continue;
-            let vals = parseCSVLine(lines[i]);
-            
-            result.push({
-                state: vals[5] || '', // Column F (Index 5)
-                city: vals[6] || '',  // Column G (Index 6)
-                zip: vals[7] || '',   // Column H (Index 7)
-                address: vals[8] || '' // Column I (Index 8)
-            });
-        }
-        return result;
-    }
+        async function handleFilter() {
+            let term = document.getElementById('zipSearchInput').value.toLowerCase().trim();
+            let radiusVal = document.getElementById('radiusSelect').value;
 
-    // Haversine distance formula in miles
-    function calculateDistance(lat1, lon1, lat2, lon2) {
-        const R = 3958.8; 
-        let dLat = (lat2 - lat1) * Math.PI / 180;
-        let dLon = (lon2 - lon1) * Math.PI / 180;
-        let a = 
-            Math.sin(dLat/2) * Math.sin(dLat/2) +
-            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-            Math.sin(dLon/2) * Math.sin(dLon/2);
-        let c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        return R * c;
-    }
+            let baseFiltered = resolvedEvents;
 
-    async function loadSheetData() {
-        document.getElementById('mapStatus').innerText = "Syncing with Google Sheet...";
-        try {
-            let response = await fetch(responseSheetUrl + "&t=" + new Date().getTime());
-            let text = await response.text();
-            let rawEvents = parseCSV(text);
-            
-            resolvedEvents = [];
-            document.getElementById('mapStatus').innerText = `Geocoding ${rawEvents.length} locations...`;
+            if (term) {
+                baseFiltered = baseFiltered.filter(ev => 
+                    ev.zip.toLowerCase().includes(term) ||
+                    ev.city.toLowerCase().includes(term) ||
+                    ev.state.toLowerCase().includes(term) ||
+                    ev.address.toLowerCase().includes(term)
+                );
+            }
 
-            for (const ev of rawEvents) {
-                if (!ev.city && !ev.zip && !ev.address && !ev.state) continue;
-                let query = `${ev.address}, ${ev.city}, ${ev.state} ${ev.zip}`;
-                
+            if (radiusVal !== "all" && term && baseFiltered.length > 0) {
                 try {
-                    let res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+                    let res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(term)}`);
                     let json = await res.json();
-                    
                     if (json.length > 0) {
-                        resolvedEvents.push({
-                            ...ev,
-                            lat: parseFloat(json[0].lat),
-                            lon: parseFloat(json[0].lon)
+                        let centerLat = parseFloat(json[0].lat);
+                        let centerLon = parseFloat(json[0].lon);
+                        let maxDistance = parseFloat(radiusVal);
+
+                        baseFiltered = baseFiltered.filter(ev => {
+                            let dist = calculateDistance(centerLat, centerLon, ev.lat, ev.lon);
+                            return dist <= maxDistance;
                         });
                     }
                 } catch (err) {
-                    console.error("Geocode error skipped");
+                    console.error("Radius calculation failed");
                 }
             }
 
-            renderEvents(resolvedEvents);
-            document.getElementById('mapStatus').innerText = `Synced (${resolvedEvents.length} events loaded)`;
-        } catch (e) {
-            document.getElementById('eventSidebarList').innerHTML = '<div class="event-card-placeholder">Failed to connect to sheet data.</div>';
-            document.getElementById('mapStatus').innerText = "Sync error";
+            renderEvents(baseFiltered);
         }
-    }
+
+        document.getElementById('searchBtn').addEventListener('click', handleFilter);
+        document.getElementById('zipSearchInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') handleFilter();
+        });
+        document.getElementById('radiusSelect').addEventListener('change', handleFilter);
+
+        loadSheetData();
+        setInterval(loadSheetData, 300000);
+    });
 
     function renderEvents(eventsToRender) {
         markersLayer.clearLayers();
@@ -389,7 +437,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 <h3>Event Location</h3>
                 <p><strong>Address:</strong> ${ev.address || 'N/A'}</p>
                 <p><strong>City, State:</strong> ${ev.city}, ${ev.state} ${ev.zip}</p>
-                <a href="${rsvpFormUrl}" target="_blank" class="rsvp-btn-popup">RSVP For This Event</a>
+                <a href="https://docs.google.com/forms/d/e/1FAIpQLSfiDlq2TF_bDsWBCFGq-AeBpZjVAi43Gt8BTwn03wObSKjpSQ/viewform?usp=dialog" target="_blank" class="rsvp-btn-popup">RSVP For This Event</a>
             </div>`;
 
             let marker = L.marker([ev.lat, ev.lon]).addTo(markersLayer);
@@ -403,55 +451,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
         document.getElementById('eventSidebarList').innerHTML = sidebarHTML;
     }
-
-    async function handleFilter() {
-        let term = document.getElementById('zipSearchInput').value.toLowerCase().trim();
-        let radiusVal = document.getElementById('radiusSelect').value;
-
-        let baseFiltered = resolvedEvents;
-
-        // 1. Text Search Filter across all fields
-        if (term) {
-            baseFiltered = baseFiltered.filter(ev => 
-                ev.zip.toLowerCase().includes(term) ||
-                ev.city.toLowerCase().includes(term) ||
-                ev.state.toLowerCase().includes(term) ||
-                ev.address.toLowerCase().includes(term)
-            );
-        }
-
-        // 2. Radius Distance Filter if a radius is chosen and text query exists
-        if (radiusVal !== "all" && term && baseFiltered.length > 0) {
-            try {
-                let res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(term)}`);
-                let json = await res.json();
-                if (json.length > 0) {
-                    let centerLat = parseFloat(json[0].lat);
-                    let centerLon = parseFloat(json[0].lon);
-                    let maxDistance = parseFloat(radiusVal);
-
-                    baseFiltered = baseFiltered.filter(ev => {
-                        let dist = calculateDistance(centerLat, centerLon, ev.lat, ev.lon);
-                        return dist <= maxDistance;
-                    });
-                }
-            } catch (err) {
-                console.error("Radius calculation failed");
-            }
-        }
-
-        renderEvents(baseFiltered);
-    }
-
-    document.getElementById('searchBtn').addEventListener('click', handleFilter);
-    document.getElementById('zipSearchInput').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') handleFilter();
-    });
-    document.getElementById('radiusSelect').addEventListener('change', handleFilter);
-
-    loadSheetData();
-    setInterval(loadSheetData, 300000);
-});
 </script>
 </body>
 </html>
