@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Community Events Map</title>
-    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
     <style>
         body {
@@ -223,7 +222,7 @@
     <div class="map-sidebar-panel">
         <div class="search-controls-wrapper">
             <div class="search-bar-container">
-                <input type="text" id="zipSearchInput", "StateSearchInput", "CitySearchInput" placeholder="Filter by city, state, or zip..." />
+                <input type="text" id="zipSearchInput" placeholder="Filter by city, state, or zip..." />
                 <button id="searchBtn" class="search-icon-btn" type="button" aria-label="Search">
                     <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
                 </button>
@@ -293,17 +292,30 @@
 
         function parseCSV(text) {
             let lines = text.split("\n");
+            if (lines.length === 0) return [];
+
+            let headers = parseCSVLine(lines[0]).map(h => h.toLowerCase());
+            
+            let stateIdx = headers.findIndex(h => h.includes('state') || h.includes('estado'));
+            let cityIdx = headers.findIndex(h => h.includes('city') || h.includes('ciudad'));
+            let zipIdx = headers.findIndex(h => h.includes('zip') || h.includes('postal'));
+            let addressIdx = headers.findIndex(h => h.includes('address') || h.includes('dirección'));
+
+            if (stateIdx === -1) stateIdx = 5;
+            if (cityIdx === -1) cityIdx = 6;
+            if (zipIdx === -1) zipIdx = 7;
+            if (addressIdx === -1) addressIdx = 8;
+
             let result = [];
             for (let i = 1; i < lines.length; i++) {
                 if (!lines[i].trim()) continue;
                 let vals = parseCSVLine(lines[i]);
                 
-                let stateVal = vals[5] || '';
-                let cityVal = vals[6] || '';
-                let zipVal = vals[7] || '';
-                let addressVal = vals[8] || '';
+                let stateVal = vals[stateIdx] || '';
+                let cityVal = vals[cityIdx] || '';
+                let zipVal = vals[zipIdx] || '';
+                let addressVal = vals[addressIdx] || '';
 
-                // Skip completely empty rows
                 if (!stateVal && !cityVal && !zipVal && !addressVal) continue;
 
                 result.push({
@@ -322,8 +334,7 @@
             let dLon = (lon2 - lon1) * Math.PI / 180;
             let a = 
                 Math.sin(dLat/2) * Math.sin(dLat/2) +
-                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-                Math.sin(dLon/2) * Math.sin(dLon/2);
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
             let c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
             return R * c;
         }
@@ -339,7 +350,6 @@
                 document.getElementById('mapStatus').innerText = `Geocoding ${rawEvents.length} locations...`;
 
                 for (const ev of rawEvents) {
-                    // Try full address query first
                     let query = `${ev.address}, ${ev.city}, ${ev.state} ${ev.zip}`;
                     let lat = null, lon = null;
                     
@@ -351,7 +361,6 @@
                             lat = parseFloat(json[0].lat);
                             lon = parseFloat(json[0].lon);
                         } else {
-                            // Fallback: Try just City, State & Zip if full address fails (handles typos in street name)
                             let fallbackQuery = `${ev.city}, ${ev.state} ${ev.zip}`;
                             let fbRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fallbackQuery)}`);
                             let fbJson = await fbRes.json();
@@ -369,95 +378,4 @@
                             });
                         }
                     } catch (err) {
-                        console.error("Geocode error skipped for row");
-                    }
-                }
-
-                renderEvents(resolvedEvents);
-                document.getElementById('mapStatus').innerText = `Synced (${resolvedEvents.length} of ${rawEvents.length} events loaded)`;
-            } catch (e) {
-                document.getElementById('eventSidebarList').innerHTML = '<div class="event-card-placeholder">Failed to connect to sheet data.</div>';
-                document.getElementById('mapStatus').innerText = "Sync error";
-            }
-        }
-
-        async function handleFilter() {
-            let term = document.getElementById('zipSearchInput').value.toLowerCase().trim();
-            let radiusVal = document.getElementById('radiusSelect').value;
-
-            let baseFiltered = resolvedEvents;
-
-            if (term) {
-                baseFiltered = baseFiltered.filter(ev => 
-                    ev.zip.toLowerCase().includes(term) ||
-                    ev.city.toLowerCase().includes(term) ||
-                    ev.state.toLowerCase().includes(term) ||
-                    ev.address.toLowerCase().includes(term)
-                );
-            }
-
-            if (radiusVal !== "all" && term && baseFiltered.length > 0) {
-                try {
-                    let res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(term)}`);
-                    let json = await res.json();
-                    if (json.length > 0) {
-                        let centerLat = parseFloat(json[0].lat);
-                        let centerLon = parseFloat(json[0].lon);
-                        let maxDistance = parseFloat(radiusVal);
-
-                        baseFiltered = baseFiltered.filter(ev => {
-                            let dist = calculateDistance(centerLat, centerLon, ev.lat, ev.lon);
-                            return dist <= maxDistance;
-                        });
-                    }
-                } catch (err) {
-                    console.error("Radius calculation failed");
-                }
-            }
-
-            renderEvents(baseFiltered);
-        }
-
-        document.getElementById('searchBtn').addEventListener('click', handleFilter);
-        document.getElementById('zipSearchInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') handleFilter();
-        });
-        document.getElementById('radiusSelect').addEventListener('change', handleFilter);
-
-        loadSheetData();
-        setInterval(loadSheetData, 300000);
-    });
-
-    function renderEvents(eventsToRender) {
-        markersLayer.clearLayers();
-        let sidebarHTML = "";
-
-        if (eventsToRender.length === 0) {
-            document.getElementById('eventSidebarList').innerHTML = '<div class="event-card-placeholder">No matching events found.</div>';
-            return;
-        }
-
-        eventsToRender.forEach((ev, idx) => {
-            let popup = `<div class="map-popup-box">
-                <h3>Event Location</h3>
-                <p><strong>Address:</strong> ${ev.address || 'N/A'}</p>
-                <p><strong>City :</strong> ${ev.city}</p>
-                <p><strong>State:</strong> ${ev.state}</p>
-                 <p><strong>Zip Code:</strong> ${ev.zip}</p>
-                <a href="https://docs.google.com/forms/d/e/1FAIpQLSfiDlq2TF_bDsWBCFGq-AeBpZjVAi43Gt8BTwn03wObSKjpSQ/viewform?usp=dialog" target="_blank" class="rsvp-btn-popup">RSVP For This Event</a>
-            </div>`;
-
-            let marker = L.marker([ev.lat, ev.lon]).addTo(markersLayer);
-            marker.bindPopup(popup);
-
-            sidebarHTML += `<div class="sidebar-event-card" onclick="map.setView([${ev.lat}, ${ev.lon}], 14); markersLayer.getLayers()[${idx}].openPopup();">
-                <h4>${ev.city ? ev.city.toUpperCase() + ', ' : ''}${ev.state.toUpperCase()} (${ev.zip})</h4>
-                <p>${ev.address || 'View details on map'}</p>
-            </div>`;
-        });
-
-        document.getElementById('eventSidebarList').innerHTML = sidebarHTML;
-    }
-</script>
-</body>
-</html>
+                        console.error("Geocode error skipped
